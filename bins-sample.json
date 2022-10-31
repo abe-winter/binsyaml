@@ -1,0 +1,8 @@
+{
+  "ory": {
+    "version": "0.1.45",
+    "url": "https://github.com/ory/cli/releases/download/v{version}/ory_{version}-linux_sqlite_64bit.tar.gz",
+    "version_flag": "version",
+    "version_regex": "Version:\\s+v([\\d\\.]+)"
+  }
+}

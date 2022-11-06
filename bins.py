@@ -23,7 +23,7 @@ def install(bin_name, archive_name, dest):
 class Spec:
     name: str
     url: str
-    version: str
+    version: Optional[str] = None
     version_flag: str = '--version'
     version_regex: Optional[str] = None
 
@@ -35,9 +35,12 @@ class Spec:
     def dl_target(self):
         return self.dl_url().split('/')[-1]
 
+    def bin_exists(self, dest: str):
+        return os.path.exists(os.path.join(dest, self.name))
+
     def installed_version(self, dest: str):
         "return installed version of tool"
-        if not os.path.exists(os.path.join(dest, self.name)):
+        if not self.bin_exists(dest):
             return None
         ret = subprocess.run([os.path.join(dest, self.name), self.version_flag], capture_output=True)
         return re.search(self.version_regex, ret.stdout.decode()).groups()[0] if self.version_regex else ret.stdout.strip()
@@ -67,7 +70,8 @@ def main():
     if args.scratch:
         raise NotImplementedError('todo: makedirs() and chdir')
     for spec in specs:
-        if spec.installed_version(args.dest) == spec.version:
+        # note: bin_exists only necessary for tools with null version
+        if spec.bin_exists(args.dest) and spec.installed_version(args.dest) == spec.version:
             logger.debug('skipping already-installed %s:%s', spec.name, spec.version)
             continue
         if os.path.exists(spec.dl_target()):

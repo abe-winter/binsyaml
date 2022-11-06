@@ -5,3 +5,7 @@ Tool to download + install binaries according to a declarative spec. Use this li
 Uses json not yaml (despite the name).
 
 See `bins-sample.json` in this repo for an example of the file format.
+
+## roadmap
+
+- [ ] mechanism for checking latest version in release folder

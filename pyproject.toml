@@ -1,0 +1,13 @@
+[project]
+name = "binsyaml"
+description = "command + declarative format to manage downloading unpackaged binaries"
+readme = "README.md"
+# requires-python = ">=3.7" # no idea
+# license = {text = "todo ..."}
+dynamic = ["version"]
+
+[tool.setuptools.dynamic]
+version = {attr = "bins.__version__"}
+
+[project.scripts]
+binsyaml = "bins:main"

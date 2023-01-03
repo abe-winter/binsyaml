@@ -4,6 +4,7 @@
 import argparse, subprocess, json, dataclasses, logging, os, tarfile, re
 from typing import Optional, Literal
 
+__version__ = '0.0.1'
 logger = logging.getLogger(__name__)
 
 def download(url):

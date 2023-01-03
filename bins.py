@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 "load bins.json and install missing files"
 
-import argparse, subprocess, json, dataclasses, logging, os, tarfile, re
+import argparse, subprocess, json, dataclasses, logging, os, tarfile, re, urllib.parse
 from typing import Optional, Literal
 
 __version__ = '0.0.1'
@@ -9,19 +9,23 @@ logger = logging.getLogger(__name__)
 
 def download(url):
     "run wget in subprocess"
-    subprocess.run(['wget', url])
+    subprocess.run(['wget', url]).check_returncode()
     logger.info('ok dl %s', url)
 
 def install(bin_name, archive_name, dest, extract):
     extensions = archive_name.split('.')
+    if not os.path.exists(dest):
+        os.makedirs(dest)
+    # todo: arg to prevent from ever requesting sudo
+    sudo = () if os.access(dest, os.W_OK) else ('sudo',)
     if extract == 'tar' and ('tar' in extensions or 'tgz' in extensions):
         logger.debug('installing %s in %s from archive %s', bin_name, dest, archive_name)
         tarfile.open(archive_name).extract(bin_name)
-        subprocess.run(['sudo', 'install', bin_name, dest])
+        subprocess.run([*sudo, 'install', bin_name, dest])
     elif extract == 'rename':
-        logger.debug('installing %s in %s from archive %s', bin_name, dest, archive_name)
+        logger.debug('copying %s to %s from archive %s', bin_name, dest, archive_name)
         subprocess.run(['chmod', '+x', archive_name])
-        subprocess.run(['sudo', 'install', archive_name, os.path.join(dest, bin_name)])
+        subprocess.run([*sudo, 'install', archive_name, os.path.join(dest, bin_name)])
     else:
         raise ValueError('unknown extension type in', archive_name)
 
@@ -35,12 +39,18 @@ class Spec:
     extract: Literal['tar', 'rename'] = 'tar'
 
     def dl_url(self):
+        # todo: shortcut for github releases
+        # todo: extra args e.g. for platform
         return self.url.format(version=self.version) \
             if '{version}' in self.url \
             else self.url
 
     def dl_target(self):
-        return self.dl_url().split('/')[-1]
+        "download location of the archive"
+        # todo: add args.download_cache
+        # note: we parse the URL in case there's a ?query or #hash
+        url = urllib.parse.urlparse(self.dl_url())
+        return url.path.split('/')[-1]
 
     def bin_exists(self, dest: str):
         return os.path.exists(os.path.join(dest, self.name))
@@ -87,8 +97,9 @@ def main():
             download(spec.dl_url())
         if not args.noinstall:
             install(spec.name, spec.dl_target(), args.dest, spec.extract)
-        if args.clean:
-            raise NotImplementedError('todo: delete archives')
+        if args.clean and os.path.exists((target := spec.dl_target())):
+            os.remove(target)
+            logger.debug('deleted archive %s', target)
 
 if __name__ == '__main__':
     main()

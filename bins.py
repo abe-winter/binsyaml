@@ -4,7 +4,7 @@
 import argparse, subprocess, json, dataclasses, logging, os, tarfile, re, urllib.parse
 from typing import Optional, Literal
 
-__version__ = '0.0.1'
+__version__ = '0.0.2'
 logger = logging.getLogger(__name__)
 
 def download(url):
@@ -62,12 +62,17 @@ class Spec:
         ret = subprocess.run([os.path.join(dest, self.name), self.version_flag], capture_output=True)
         return re.search(self.version_regex, ret.stdout.decode()).groups()[0] if self.version_regex else ret.stdout.strip()
 
+@dataclasses.dataclass
+class Conf:
+    "config embedded in json file"
+    dest: str = '/usr/local/bin'
+
 LEVELS = {lev[0]: lev for lev in ('INFO', 'CRITICAL', 'DEBUG', 'ERROR', 'WARNING', 'FATAL', 'NOTSET')}
 
 def main():
     p = argparse.ArgumentParser()
     p.add_argument('--path', default='bins.json', help="path to conf file")
-    p.add_argument('--dest', default='/usr/local/bin', help="destination folder for install")
+    p.add_argument('--dest', help="destination folder for install")
     p.add_argument('--only', help="install only one tool")
     p.add_argument('--scratch', help="scratch download location")
     p.add_argument('--noinstall', action='store_true', help="just download, don't install")
@@ -77,18 +82,24 @@ def main():
 
     logging.basicConfig(level=LEVELS.get(args.level, args.level))
 
+    loaded = json.load(open(args.path))
     specs = [
         Spec(name=name, **raw)
-        for name, raw in json.load(open(args.path)).items()
+        for name, raw in loaded.items()
+        if name != '__binsyaml__'
     ]
     logger.info('loaded %d specs', len(specs))
+    conf = Conf()
+    if '__binsyaml__' in loaded:
+        conf = Conf(**loaded['__binsyaml__'])
     if args.only:
         raise NotImplementedError('todo: support --only')
     if args.scratch:
         raise NotImplementedError('todo: makedirs() and chdir')
+    dest = args.dest or conf.dest
     for spec in specs:
         # note: bin_exists only necessary for tools with null version
-        if spec.bin_exists(args.dest) and spec.installed_version(args.dest) == spec.version:
+        if spec.bin_exists(dest) and spec.installed_version(dest) == spec.version:
             logger.debug('skipping already-installed %s:%s', spec.name, spec.version)
             continue
         if os.path.exists(spec.dl_target()):
@@ -96,7 +107,7 @@ def main():
         else:
             download(spec.dl_url())
         if not args.noinstall:
-            install(spec.name, spec.dl_target(), args.dest, spec.extract)
+            install(spec.name, spec.dl_target(), dest, spec.extract)
         if args.clean and os.path.exists((target := spec.dl_target())):
             os.remove(target)
             logger.debug('deleted archive %s', target)
